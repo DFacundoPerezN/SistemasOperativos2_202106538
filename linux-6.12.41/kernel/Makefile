@@ -12,7 +12,7 @@ obj-y     = fork.o exec_domain.o panic.o \
 	    notifier.o ksysfs.o cred.o reboot.o \
 	    async.o range.o smpboot.o ucount.o regset.o ksyms_common.o \
 		syscall_time.o \
-#		syscall_cpu_usage.o \
+		syscall_cpu_usage.o \
 		syscall_ram_usage.o \
 		syscall_logs.o \
 		syscall_encrypt.o

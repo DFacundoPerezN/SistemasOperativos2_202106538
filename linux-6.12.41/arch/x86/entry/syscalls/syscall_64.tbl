@@ -442,6 +442,6 @@
 #548 common usac_hello            sys_usac_hello
 #549 common kernel_logs            sys_kernel_logs
 550 common uptime_s             sys_uptime_s
-#51 common cpu_usage            sys_cpu_usage
+551 common cpu_usage            sys_cpu_usage
 #552 common ram_usage            sys_ram_usage
 #553 common my_encrypt           sys_my_encrypt
