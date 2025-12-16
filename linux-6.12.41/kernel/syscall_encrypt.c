@@ -180,28 +180,28 @@ int handle_file_encryption(const char *input_filepath, const char *output_filepa
 
 // 7. LIMPIEZA DE MEMORIA (GARBAGE COLLECTION MANUAL)
 // En C y Kernel, debes liberar todo lo que reservaste con kmalloc
-free_all_resources:
-    kfree(thread_list);
-    kfree(task_list);
-    kfree(fragment_list);
+    free_all_resources:
+        kfree(thread_list);
+        kfree(task_list);
+        kfree(fragment_list);
 
-free_file_buffer:
-    kfree(file_buffer);
+    free_file_buffer:
+        kfree(file_buffer);
 
-free_encryption_key:
-    kfree(encryption_key);
+    free_encryption_key:
+        kfree(encryption_key);
 
-close_key_file:
-    filp_close(key_file, NULL);
+    close_key_file:
+        filp_close(key_file, NULL);
 
-close_output_file:
-    filp_close(output_file, NULL);
+    close_output_file:
+        filp_close(output_file, NULL);
 
-close_input_file:
-    filp_close(input_file, NULL);
+    close_input_file:
+        filp_close(input_file, NULL);
 
-exit:
-    return ret_val;
+    exit:
+        return ret_val;
 }
 
 // Definición de la System Call (lo que llama el usuario)
