@@ -25,7 +25,8 @@ int main(int argc, char *argv[]) {
     int cpu_usage;
     long resultCPU = syscall(sys_cpu_usage, &cpu_usage);
     if (resultCPU == 0) {
-        printf("CPU Usage: %d.%2d%%\n", cpu_usage/100, cpu_usage%100);
+        printf("CPU in Usage: %d.%2d%%\n", cpu_usage/100, cpu_usage%100);
+        printf("CPU free: %d.%2d%%\n", 99-cpu_usage/100, 100-cpu_usage%100);
     } else {
         printf("No se pudo obtener el uso de CPU (La syscall devolvio un estado de error)\n");
     }
@@ -33,7 +34,8 @@ int main(int argc, char *argv[]) {
     int ram_usage;
     long resultRAM = syscall(sys_ram_usage, &ram_usage);
     if (resultRAM == 0) {
-        printf("RAM Usage: %d.%2d%%\n", ram_usage/100, ram_usage%100);
+        printf("RAM in Usage: %d.%2d%%\n", ram_usage/100, ram_usage%100);
+        printf("RAM Free: %d.%2d%%\n", 99-ram_usage/100, 100-ram_usage%100);
     } else {
         printf("No se pudo obtener el uso de RAM (La syscall devolvio un estado de error)\n");
     }
