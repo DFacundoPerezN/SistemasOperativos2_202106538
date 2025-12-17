@@ -13,58 +13,6 @@
 #define sys_my_encrypt 553
 #define sys_my_decrypt 554
 
-
-void cryptAnalizer(int syscall_number) {
-    char file_input[256] = {0}, file_output[256] = {0}, key[256] = {0};
-    int threads_numbers = 0;
-    char command[256];
-    bool run = true;
-
-    while(run){
-        printf("\nIngrese un parametro (-p, -o, -k, -j o run para ejecutar): ");
-        fgets(command, sizeof(command), stdin);
-        command[strcspn(command, "\n")] = 0;
-
-        if (strcmp(command, "-p") == 0) {
-            printf("Archivo de entrada: ");
-            fgets(file_input, sizeof(file_input), stdin);
-            file_input[strcspn(file_input, "\n")] = 0;
-
-        } else if (strcmp(command, "-o") == 0) {
-            printf("Archivo de salida: ");
-            fgets(file_output, sizeof(file_output), stdin);
-            file_output[strcspn(file_output, "\n")] = 0;
-
-        } else if (strcmp(command, "-k") == 0) {
-            printf("Clave: ");
-            fgets(key, sizeof(key), stdin);
-            key[strcspn(key, "\n")] = 0;
-
-        } else if (strcmp(command, "-j") == 0) {
-            printf("Número de hilos: ");
-            scanf("%d", &threads_numbers);
-            getchar();
-
-        } else if (strcmp(command, "run") == 0) {
-
-            if (strlen(file_input) == 0 || strlen(file_output) == 0 || strlen(key) == 0 || threads_numbers == 0) {
-                printf("\nFaltan parametros obligatorios ...\n");
-                continue;
-            }
-
-            long result = syscall(syscall_number, file_input, file_output, key, threads_numbers);
-            if (result >= 0)
-                printf("Archivo encriptado exitosamente\n");
-            else
-                printf("Ocurrió un error\n");
-
-            return;  
-        } else {
-            printf("Comando no reconocido\n");
-        }
-    }
-}
-
 void showLast5Logs() {
     #define LOG_BUFFER_SIZE 448
     char logs_buffer[LOG_BUFFER_SIZE];
@@ -114,6 +62,57 @@ void showRAMusage() {
         printf("RAM Free: %d.%2d%%\n", 99-ram_usage/100, 100-ram_usage%100);
     } else {
         printf("No se pudo obtener el uso de RAM (La syscall devolvio un estado de error)\n");
+    }
+}
+
+void cryptAnalizer(int syscall_number) {
+    char file_input[256] = {0}, file_output[256] = {0}, key[256] = {0};
+    int threads_numbers = 0;
+    char command[256];
+    bool run = true;
+
+    while(run){
+        printf("\nIngrese un parametro (-p, -o, -k, -j o run para ejecutar): ");
+        fgets(command, sizeof(command), stdin);
+        command[strcspn(command, "\n")] = 0;
+
+        if (strcmp(command, "-p") == 0) {
+            printf("Archivo de entrada: ");
+            fgets(file_input, sizeof(file_input), stdin);
+            file_input[strcspn(file_input, "\n")] = 0;
+
+        } else if (strcmp(command, "-o") == 0) {
+            printf("Archivo de salida: ");
+            fgets(file_output, sizeof(file_output), stdin);
+            file_output[strcspn(file_output, "\n")] = 0;
+
+        } else if (strcmp(command, "-k") == 0) {
+            printf("Clave: ");
+            fgets(key, sizeof(key), stdin);
+            key[strcspn(key, "\n")] = 0;
+
+        } else if (strcmp(command, "-j") == 0) {
+            printf("Número de hilos: ");
+            scanf("%d", &threads_numbers);
+            getchar();
+
+        } else if (strcmp(command, "run") == 0) {
+
+            if (strlen(file_input) == 0 || strlen(file_output) == 0 || strlen(key) == 0 || threads_numbers == 0) {
+                printf("\nFaltan parametros obligatorios ...\n");
+                continue;
+            }
+
+            long result = syscall(syscall_number, file_input, file_output, key, threads_numbers);
+            if (result >= 0)
+                printf("Archivo encriptado exitosamente\n");
+            else
+                printf("Ocurrió un error\n");
+
+            return;  
+        } else {
+            printf("Comando no reconocido\n");
+        }
     }
 }
 
