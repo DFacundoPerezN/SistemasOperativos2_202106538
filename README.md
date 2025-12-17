@@ -117,55 +117,61 @@ int width = 0, height = 0;
         printf("No se pudo obtener la resolucion de pantalla\n");
     }
 ```
-### Codigo 
+### Codigo Syscall
 ```c
-static int initVirtualKeyboard(void)
+#include <linux/kernel.h>
+#include <linux/syscalls.h>
+#include <linux/uaccess.h> // Necesario para put_user()
+#include <linux/mm.h>      // si_meminfo, struct sysinfo, PAGE_SIZE
+
+/*
+ * SYSCALL_DEFINE1: Macro para definir la llamada al sistema.
+ * - Nombre: ram_usage_info
+ * - Argumentos: 1 (int *ram_usage_out)
+ * - __user: Indica que el puntero viene del espacio de usuario.
+ *
+ * Retorna el porcentaje de uso de RAM actual (multiplicado por 100, ej: 5050 para 50.50%).
+ */
+SYSCALL_DEFINE1(ram_usage, int __user *, ram_usage_out)
 {
-	int err;
+    struct sysinfo si;
+    u64 total_ram_pages, free_ram_pages, used_ram_pages;
+    u32 percent_usage_x100 = 0; // Valor a retornar (0 a 10000)
+    u64 used_ram_x10000;
 
-	if (virtualKeyboard)
-		return 0;
+    // 1. VALIDACIÓN: Verificar que el puntero de usuario sea válido
+    if (!ram_usage_out) {
+        return -EINVAL; // Error de argumento inválido
+    }
 
-	virtualKeyboard = input_allocate_device();
-	if (!virtualKeyboard)
-		return -ENOMEM;
+    // 2. OBTENER INFORMACIÓN DE MEMORIA
+    // si_meminfo rellena la estructura 'si' con métricas de memoria en unidades de página.
+    si_meminfo(&si);
 
-	virtualKeyboard->name  = "virtualKeyboard";
-	virtualKeyboard->phys  = "vmd/input1";
-	virtualKeyboard->id.bustype = BUS_VIRTUAL;
-	virtualKeyboard->id.vendor  = 0x0010;
-	virtualKeyboard->id.product = 0x0011;
-	virtualKeyboard->id.version = 0x0001;
+    // 3. CALCULAR USO EN PÁGINAS (Usamos u64 para evitar desbordamiento)
+    total_ram_pages = (u64)si.totalram;
+    free_ram_pages = (u64)si.freeram;
+    used_ram_pages = total_ram_pages - free_ram_pages;
 
-	__set_bit(EV_KEY, virtualKeyboard->evbit);
+    // 4. CALCULAR PORCENTAJE (Fixed Point: Multiplicado por 10000)
+    if (total_ram_pages > 0) {
+        // Multiplicamos el uso por 10000 antes de dividir por el total.
+        // Esto nos da el porcentaje con dos decimales de precisión.
+        used_ram_x10000 = used_ram_pages * 10000ULL;
+        
+        // div64_u64 es la forma segura de dividir u64 en el kernel
+        percent_usage_x100 = (u32)div64_u64(used_ram_x10000, total_ram_pages);
+    } else {
+        // Caso de error: 0% de uso
+        percent_usage_x100 = 0;
+    }
 
-	{
-		int code;
-		for (code = 1; code < 256; code++)
-			__set_bit(code, virtualKeyboard->keybit);
-	}
+    // 5. TRANSFERENCIA AL ESPACIO DE USUARIO
+    if (put_user((int)percent_usage_x100, ram_usage_out)) {
+        return -EFAULT; // Fallo al acceder a la memoria del usuario
+    }
 
-	err = input_register_device(virtualKeyboard);
-	if (err) {
-		input_free_device(virtualKeyboard);
-		virtualKeyboard = NULL;
-		return err;
-	}
-	return 0;
-}
-
-SYSCALL_DEFINE2(move_mouse, int, dx, int, dy)
-{
-	int err = 0;
-
-	err = initVirtualMouse();
-	if (!err) {
-		input_report_rel(virtualMouse, REL_X, dx);
-		input_report_rel(virtualMouse, REL_Y, dy);
-		input_sync(virtualMouse);
-	}
-
-	return err;
+    return 0; // Éxito
 }
 ```
 
@@ -217,7 +223,7 @@ obj-y     = fork.o exec_domain.o panic.o \
 
 ### 4. Mal nombre de la syscall en la tabla
 Este error fue porque en la tabla de syscalls estaba mal referenciado la syscall del tiempo
-´´´sh
+```sh
 
 ld: arch/x86/entry/syscall_64.o: in function `x64_sys_call':
 /Sistemas_Operativos_2/Practica1/linux-6.12.41/./arch/x86/include/generated/asm/syscalls_64.h:551:(.text+0x16fe): undefined reference to `__x64_sys_uptime_syscall'
@@ -227,22 +233,22 @@ make[2]: *** [scripts/Makefile.vmlinux:34: vmlinux] Error 1
 make[1]: *** [/Sistemas_Operativos_2/Practica1/linux-6.12.41/Makefile:1180: vmlinux] Error 2
 make: *** [Makefile:224: __sub-make] Error 2
 
-´´´
+```
 En la tabla con el error: 
-´´´tbl
+```tbl
 550 common uptime_syscall        sys_uptime_syscall
-´´´
+```
 
 En el archivo C para definir la syscall: 
-´´´C
+```C
 SYSCALL_DEFINE0(uptime_ns) {
     unsigned long uptime_ns = ktime_get_ns();
     return uptime_ns;
 }
-´´´
+```
 
 
 Corregido 
-´´´tbl
+```tbl
 550 common uptime_ns        sys_uptime_ns
-´´´
+```
