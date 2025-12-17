@@ -11,58 +11,10 @@
 #define sys_cpu_usage 551
 #define sys_ram_usage 552
 #define sys_my_encrypt 553
+#define sys_my_decrypt 554
 
-int main(int argc, char *argv[]) {
-    
-    long uptime = syscall(sys_uptime_s);
-    if (uptime > 0) {
-        printf("Uptime: %ld s\n", uptime);
-    } else {
-        printf("No se pudo obtener el uptime\n");
-        printf("%ld s\n", uptime);
-    }
 
-    int cpu_usage;
-    long resultCPU = syscall(sys_cpu_usage, &cpu_usage);
-    if (resultCPU == 0) {
-        printf("CPU in Usage: %d.%2d%%\n", cpu_usage/100, cpu_usage%100);
-        printf("CPU free: %d.%2d%%\n", 99-cpu_usage/100, 100-cpu_usage%100);
-    } else {
-        printf("No se pudo obtener el uso de CPU (La syscall devolvio un estado de error)\n");
-    }
-
-    int ram_usage;
-    long resultRAM = syscall(sys_ram_usage, &ram_usage);
-    if (resultRAM == 0) {
-        printf("RAM in Usage: %d.%2d%%\n", ram_usage/100, ram_usage%100);
-        printf("RAM Free: %d.%2d%%\n", 99-ram_usage/100, 100-ram_usage%100);
-    } else {
-        printf("No se pudo obtener el uso de RAM (La syscall devolvio un estado de error)\n");
-    }
-
-    #define LOG_BUFFER_SIZE 1024
-    char logs_buffer[LOG_BUFFER_SIZE];
-    int actual_length = 0;
-    long resultLogs;
-    //Inicialr el buffer para evitar basura en la memoria 
-    memset(logs_buffer, 0, LOG_BUFFER_SIZE);
-    resultLogs = syscall(sys_kernel_logs, logs_buffer, LOG_BUFFER_SIZE, &actual_length);
-    if (resultLogs == 0) {
-        logs_buffer[actual_length] = '\0'; // Asegurar que el buffer este null-terminated
-        printf("Longuitud real de logs: %d\n", actual_length);
-        printf("Kernel Logs:\n%s\n", logs_buffer);
-    } else {
-        #include <stdio.h>
-        printf("No se pudo obtener los logs del kernel (La syscall devolvio un estado de error)\n");
-        printf("La syscall devolvio el codigo de error: %ld\n", resultLogs);
-    }
-
-    analizer();
-
-    return 0;
-}
-
-void encryptAnalizer(int syscall_number) {
+void cryptAnalizer(int syscall_number) {
     char file_input[256] = {0}, file_output[256] = {0}, key[256] = {0};
     int threads_numbers = 0;
     char command[256];
@@ -113,27 +65,107 @@ void encryptAnalizer(int syscall_number) {
     }
 }
 
+void showLast5Logs() {
+    #define LOG_BUFFER_SIZE 448
+    char logs_buffer[LOG_BUFFER_SIZE];
+    int actual_length = 0;
+    long resultLogs;
+    //Inicialr el buffer para evitar basura en la memoria 
+    memset(logs_buffer, 0, LOG_BUFFER_SIZE);
+    resultLogs = syscall(sys_kernel_logs, logs_buffer, LOG_BUFFER_SIZE, &actual_length);
+    if (resultLogs == 0) {
+        logs_buffer[actual_length] = '\0'; // Asegurar que el buffer este null-terminated
+        printf("Longuitud real de logs: %d\n", actual_length);
+        printf("Kernel Logs:\n%s\n", logs_buffer);
+    } else {
+        #include <stdio.h>
+        printf("No se pudo obtener los logs del kernel (La syscall devolvio un estado de error)\n");
+        printf("La syscall devolvio el codigo de error: %ld\n", resultLogs);
+    }
+}
+
+void showUptime() {
+    long uptime = syscall(sys_uptime_s);
+    if (uptime > 0) {
+        printf("Uptime: %ld s\n", uptime);
+    } else {
+        printf("No se pudo obtener el uptime\n");
+        printf("%ld s\n", uptime);
+    }   
+}
+
+void showCPUusage() {    
+    int cpu_usage;
+    long resultCPU = syscall(sys_cpu_usage, &cpu_usage);
+    if (resultCPU == 0) {
+        printf("CPU in Usage: %d.%2d%%\n", cpu_usage/100, cpu_usage%100);
+        printf("CPU free: %d.%2d%%\n", 99-cpu_usage/100, 100-cpu_usage%100);
+    } else {
+        printf("No se pudo obtener el uso de CPU (La syscall devolvio un estado de error)\n");
+    }
+}
+
+
+void showRAMusage() {
+    int ram_usage;
+    long resultRAM = syscall(sys_ram_usage, &ram_usage);
+    if (resultRAM == 0) {
+        printf("RAM in Usage: %d.%2d%%\n", ram_usage/100, ram_usage%100);
+        printf("RAM Free: %d.%2d%%\n", 99-ram_usage/100, 100-ram_usage%100);
+    } else {
+        printf("No se pudo obtener el uso de RAM (La syscall devolvio un estado de error)\n");
+    }
+}
+
 void analizer() {
     char command[256];
     bool run = true;
 
     while (run) {
-        printf("\n****  Multithreading # Encrypt  ****\n");
-        printf("1. Encriptar\n");
-        printf("2. Salir\n\n");
+        printf("\n****  Menu de opciones >:3  ****\n");
+        printf("1. Ver los últimos 5 logs del kernel\n");
+        printf("2. Ver el el tiempo desde que se encendio (s)\n");
+        printf("3. Ver el uso de CPU\n");
+        printf("4. Ver el uso de RAM\n");
+        printf("5. Encriptar - Multithreading\n");
+        printf("6. Desencriptar - Multithreading\n");
+        printf("7. Salir\n\n");
         fgets(command, sizeof(command), stdin);
         command[strcspn(command, "\n")] = 0;
 
-        if (strcmp(command, "1") == 0) {
-            encryptAnalizer(sys_my_encrypt);
-        } else if (strcmp(command, "2") == 0) {
-            printf("Hasta luego !\n");
+        if (strcmp(command, "5") == 0) {
+            cryptAnalizer(sys_my_encrypt);
+        } 
+        else if (strcmp(command, "6") == 0) {
+            cryptAnalizer(sys_my_decrypt);
+        }  
+        else if (strcmp(command, "4") == 0) {
+            showRAMusage();
+        }  
+        else if (strcmp(command, "3") == 0) {
+            showCPUusage();
+        }  
+        else if (strcmp(command, "2") == 0) {
+            showUptime();
+        }  
+        else if (strcmp(command, "1") == 0) {
+            showLast5Logs();
+        } 
+        else if (strcmp(command, "7") == 0) {
+            printf("Hemos finalizado :)\n");
             run = false;
             return;
         }else {
             printf("Comando - %s - no reconocido, vuelva a intentarlo", command);
         }
     }
+}
+
+
+int main(int argc, char *argv[]) {
+    analizer();
+
+    return 0;
 }
 
 // gcc test.c -o test 

@@ -439,9 +439,10 @@
 #  x32: solo para x32
 # Tercer valor es el nombre formal de la funcion usado en SYSCALL_DEFINEX(>nombre<)
 # Cuarto valor es el nombre del simbolo que se le dará a la syscall en el codigo generado por el macro SYSCALL_DEFINEX
-#548 common usac_hello            sys_usac_hello
+548 common usac_hello            sys_usac_hello
 549 common kernel_logs            sys_kernel_logs
 550 common uptime_s             sys_uptime_s
 551 common cpu_usage            sys_cpu_usage
 552 common ram_usage            sys_ram_usage
 553 common my_encrypt           sys_my_encrypt
+554 common my_decrypt           sys_my_decrypt

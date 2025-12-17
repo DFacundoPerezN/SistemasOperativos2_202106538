@@ -15,7 +15,8 @@ obj-y     = fork.o exec_domain.o panic.o \
 		syscall_cpu_usage.o \
 		syscall_ram_usage.o \
 		syscall_logs.o \
-		syscall_encrypt.o
+		syscall_encrypt.o\
+		syscall_decrypt.o
 
 obj-$(CONFIG_USERMODE_DRIVER) += usermode_driver.o
 obj-$(CONFIG_MULTIUSER) += groups.o
