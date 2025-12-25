@@ -80,6 +80,23 @@ int main() {
         return crow::response(response);
     });
 
+    //endpoint: /logs
+    CROW_ROUTE(app, "/logs")([](){
+        #define LOG_BUFFER_SIZE 1024*4
+        char logs_buffer[LOG_BUFFER_SIZE];
+        int actual_length = 0;
+        //Inicialr el buffer para evitar basura en la memoria 
+        memset(logs_buffer, 0, LOG_BUFFER_SIZE);
+        int resultLogs = syscall(SYS_KERNEL_LOGS, logs_buffer, LOG_BUFFER_SIZE, &actual_length);
+        if (resultLogs != 0) {
+            return crow::response(500, "Error al ejecutar la syscall de logs");
+        }
+        logs_buffer[actual_length] = '\0'; // Asegurar que el buffer este null-terminated
+        crow::json::wvalue response;
+        response["logs"] = std::string(logs_buffer);
+        return crow::response(response);
+    });
+
     app.port(18080).multithreaded().run();
     return 0;
 }
