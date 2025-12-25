@@ -69,6 +69,19 @@ int main() {
         
     });
 
+    // endpoint: /uptime
+    CROW_ROUTE(app, "/uptime")([](){
+        unsigned int uptime = syscall(SYS_UPTIME_S);
+        if (uptime < 0) {
+            return crow::response(500, "Error al ejecutar la syscall de uptime");
+        }
+        crow::json::wvalue response;
+        response["uptime_seconds"] = uptime;
+        return crow::response(response);
+    });
+
+    app.port(18080).multithreaded().run();
+    return 0;
 }
 
 /* 
