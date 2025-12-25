@@ -3,7 +3,10 @@
 #include <cstring>
 #include <crow.h>
 // Definición dde codigos de las syscalls
+#define SYS_KERNEL_LOGS 549
+#define SYS_UPTIME_S 550
 #define SYS_CPU_USAGE 551
+#define SYS_RAM_USAGE 552
 
 // --- Middleware CORS ---
 struct CORS {
@@ -34,6 +37,7 @@ int main() {
     // Endpoint: /stats
     CROW_ROUTE(app, "/stats")([](){
         short cpu_usage = 0;
+        short ram_usage = 0;
         
         // Ejecutamos la syscall
         long res = syscall(SYS_CPU_USAGE, &cpu_usage);
@@ -43,14 +47,24 @@ int main() {
             return crow::response(500, "Error al ejecutar la syscall de uso de cpu");
         }
 
+        res = syscall(SYS_RAM_USAGE, &ram_usage);
+        
+        if (res != 0) {
+            // Si la syscall falla, devolvemos un error 500
+            return crow::response(500, "Error al ejecutar la syscall de uso de ram");
+        }
+
         // Cálculos
         // Suponiendo que cpu_usage viene en formato XXXX (ej. 1500 = 15.00%)
         float usage_percentage = cpu_usage / 100.0;
+        float ram_percentage = ram_usage / 100.0;
 
         // Construimos el JSON de respuesta
         crow::json::wvalue response;
         response["cpu_usage"] = cpu_usage;
+        response["ram_usage"] = ram_usage;
         response["cpu_usage_percentage"] = usage_percentage;
+        response["ram_usage_percentage"] = ram_percentage;
         return crow::response(response);
         
     });
