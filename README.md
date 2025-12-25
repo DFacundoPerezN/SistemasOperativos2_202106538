@@ -79,7 +79,7 @@ sudo update-grub
 ```
 Y vuelves a reiniciar.
 
-## Frawmentos del Código
+## Fragmentos del Código
 
 ### Makefile del Kernel
 Aqui definimos datos y como se procedera con la construcción del kernel
