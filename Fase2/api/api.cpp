@@ -185,7 +185,7 @@ int main() {
         std::string key_path = std::filesystem::absolute(raw_key).string();
 
         // Llamada a la syscall usando los paths absolutos
-        long result = syscall(SYS_MY_ENCRYPT, file_input.c_str(), file_output.c_str(), key_path.c_str(), threads);
+        long result = syscall(SYS_MY_ENCRYPT, file_input, file_output, key_path, threads);
 
         crow::json::wvalue response;
         response["result"] = result;
@@ -195,6 +195,34 @@ int main() {
             response["message"] = "Ocurrió un error en el kernel (Error: " + std::to_string(result) + ")";
             // Imprimimos para depurar qué rutas se están enviando exactamente
             printf("DEBUG - Input path: %s\n", file_input.c_str());
+        }
+        return crow::response(response);
+    });
+
+    //endpoint: /decrypt
+    CROW_ROUTE(app, "/decrypt").methods(crow::HTTPMethod::POST)([](const crow::request& req){
+        auto body = crow::json::load(req.body);
+        if (!body || !body.has("file_input") || !body.has("file_output") || !body.has("key") || !body.has("threads")) {
+            return crow::response(400, "Invalid JSON");
+        }
+        // Convertimos primero a std::string explícitamente
+        std::string raw_input = body["file_input"].s();
+        std::string raw_output = body["file_output"].s();
+        std::string raw_key = body["key"].s();
+        int threads = body["threads"].i();
+        // Ahora usamos filesystem::absolute con los std::string
+        std::string file_input = std::filesystem::absolute(raw_input).string();
+        std::string file_output = std::filesystem::absolute(raw_output).string();
+        std::string key_path = std::filesystem::absolute(raw_key).string();
+
+        long result = syscall(SYS_MY_DECRYPT,  file_input.c_str(), file_output.c_str(), key_path.c_str(), threads);
+        crow::json::wvalue response;
+        
+        response["result"] = result;
+        if (result >= 0){
+            response["message"] = "Archivo desencriptado exitosamente";
+        } else {
+            response["message"] = "Ocurrió un error en el kernel (Error: " + std::to_string(result) + ")";
         }
         return crow::response(response);
     });
