@@ -2,11 +2,18 @@
 #include <errno.h>
 #include <cstring>
 #include <crow.h>
+#include <sys/syscall.h>
+#include <string>
+#include <security/pam_appl.h>
+#include <security/pam_misc.h>
+#include <filesystem>
 // Definición dde codigos de las syscalls
 #define SYS_KERNEL_LOGS 549
 #define SYS_UPTIME_S 550
 #define SYS_CPU_USAGE 551
 #define SYS_RAM_USAGE 552
+#define SYS_MY_ENCRYPT 553
+#define SYS_MY_DECRYPT 554
 
 // --- Middleware CORS ---
 struct CORS {
@@ -31,6 +38,68 @@ struct CORS {
     }
 };
 
+// ------- PAM -------
+static const char* PAM_SERVICE_NAME = "login";
+
+static int pam_conv_cb(int num_msg,
+                       const struct pam_message **msg,
+                       struct pam_response **resp,
+                       void *appdata_ptr)
+{
+    if (num_msg <= 0) return PAM_CONV_ERR;
+
+    auto *responses =
+        (pam_response*)calloc(num_msg, sizeof(pam_response));
+    if (!responses) return PAM_CONV_ERR;
+
+    const char *password = (const char *)appdata_ptr;
+
+    for (int i = 0; i < num_msg; i++) {
+        switch (msg[i]->msg_style) {
+            case PAM_PROMPT_ECHO_OFF:
+                responses[i].resp = strdup(password ? password : "");
+                responses[i].resp_retcode = 0;
+                break;
+            case PAM_PROMPT_ECHO_ON:
+            case PAM_ERROR_MSG:
+            case PAM_TEXT_INFO:
+                responses[i].resp = nullptr;
+                responses[i].resp_retcode = 0;
+                break;
+            default:
+                free(responses);
+                return PAM_CONV_ERR;
+        }
+    }
+
+    *resp = responses;
+    return PAM_SUCCESS;
+}
+
+static bool pam_authenticate_user(const std::string& username,
+                                  const std::string& password,
+                                  std::string* error_out = nullptr)
+{
+    pam_handle_t* pamh = nullptr;
+    struct pam_conv conv { pam_conv_cb, (void*)password.c_str() };
+
+    int r = pam_start(PAM_SERVICE_NAME, username.c_str(), &conv, &pamh);
+    if (r != PAM_SUCCESS) {
+        if (error_out) *error_out = std::string(pam_strerror(pamh, r)) + "Contraseña incorrecta.";
+        return false;
+    }
+
+    r = pam_authenticate(pamh, 0);
+    if (r == PAM_SUCCESS)
+        r = pam_acct_mgmt(pamh, 0);
+
+    bool ok = (r == PAM_SUCCESS);
+    if (!ok && error_out)
+        *error_out = pam_strerror(pamh, r);
+
+    pam_end(pamh, r);
+    return ok;
+}
 
 int main() {
     crow::SimpleApp app;
@@ -94,6 +163,39 @@ int main() {
         logs_buffer[actual_length] = '\0'; // Asegurar que el buffer este null-terminated
         crow::json::wvalue response;
         response["logs"] = std::string(logs_buffer);
+        return crow::response(response);
+    });
+
+    //endpoint: /encrypt
+    CROW_ROUTE(app, "/encrypt").methods(crow::HTTPMethod::POST)([](const crow::request& req){
+        auto body = crow::json::load(req.body);
+        if (!body || !body.has("file_input") || !body.has("file_output") || !body.has("key") || !body.has("threads")) {
+            return crow::response(400, "Invalid JSON");
+        }
+
+        // Convertimos primero a std::string explícitamente
+        std::string raw_input = body["file_input"].s();
+        std::string raw_output = body["file_output"].s();
+        std::string raw_key = body["key"].s();
+        int threads = body["threads"].i();
+
+        // Ahora usamos filesystem::absolute con los std::string
+        std::string file_input = std::filesystem::absolute(raw_input).string();
+        std::string file_output = std::filesystem::absolute(raw_output).string();
+        std::string key_path = std::filesystem::absolute(raw_key).string();
+
+        // Llamada a la syscall usando los paths absolutos
+        long result = syscall(SYS_MY_ENCRYPT, file_input.c_str(), file_output.c_str(), key_path.c_str(), threads);
+
+        crow::json::wvalue response;
+        response["result"] = result;
+        if (result >= 0){
+            response["message"] = "Archivo encriptado exitosamente";
+        } else {
+            response["message"] = "Ocurrió un error en el kernel (Error: " + std::to_string(result) + ")";
+            // Imprimimos para depurar qué rutas se están enviando exactamente
+            printf("DEBUG - Input path: %s\n", file_input.c_str());
+        }
         return crow::response(response);
     });
 
