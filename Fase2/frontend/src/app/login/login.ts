@@ -1,11 +1,29 @@
 import { Component } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { MatInputModule } from '@angular/material/input';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCardModule } from '@angular/material/card';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-login',
-  imports: [],
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatInputModule,
+    MatButtonModule,
+    MatCardModule
+  ],
   templateUrl: './login.html',
-  styleUrl: './login.scss',
+  styleUrls: ['./login.scss']
 })
-export class Login {
+export class LoginComponent {
+  username = '';
+  password = '';
 
+  login() {
+    console.log('Usuario:', this.username);
+    console.log('Password:', this.password);
+  }
 }
