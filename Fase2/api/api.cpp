@@ -7,6 +7,10 @@
 #include <security/pam_appl.h>
 #include <security/pam_misc.h>
 #include <filesystem>
+#include <pwd.h>
+#include <grp.h>
+#include <unistd.h>
+#include <vector>
 // Definición dde codigos de las syscalls
 #define SYS_KERNEL_LOGS 549
 #define SYS_UPTIME_S 550
@@ -39,13 +43,13 @@ struct CORS {
 };
 
 // ------- PAM -------
-static const char* PAM_SERVICE_NAME = "login";
+static const char* PAM_SERVICE_NAME = "passwd";
 
-static int pam_conv_cb(int num_msg,
+static int pam_conv_callback(int num_msg,
                        const struct pam_message **msg,
                        struct pam_response **resp,
-                       void *appdata_ptr)
-{
+                       void *appdata_ptr){
+
     if (num_msg <= 0) return PAM_CONV_ERR;
 
     auto *responses =
@@ -80,25 +84,57 @@ static bool pam_authenticate_user(const std::string& username,
                                   const std::string& password,
                                   std::string* error_out = nullptr)
 {
-    pam_handle_t* pamh = nullptr;
-    struct pam_conv conv { pam_conv_cb, (void*)password.c_str() };
+    pam_handle_t* pamhandler = nullptr;
+    struct pam_conv conv { pam_conv_callback, (void*)password.c_str() };
 
-    int r = pam_start(PAM_SERVICE_NAME, username.c_str(), &conv, &pamh);
-    if (r != PAM_SUCCESS) {
-        if (error_out) *error_out = std::string(pam_strerror(pamh, r)) + "Contraseña incorrecta.";
+    int pam_result = pam_start(PAM_SERVICE_NAME, username.c_str(), &conv, &pamhandler);
+    if (pam_result != PAM_SUCCESS) {
+        if (error_out) *error_out = pam_strerror(pamhandler, pam_result);
+        printf("PAM start error: %d\n", pam_result);
         return false;
     }
 
-    r = pam_authenticate(pamh, 0);
-    if (r == PAM_SUCCESS)
-        r = pam_acct_mgmt(pamh, 0);
+    pam_result = pam_authenticate(pamhandler, 0);
+    if (pam_result == PAM_SUCCESS){
+        pam_result = pam_acct_mgmt(pamhandler, 0);
+        //printf("pam_acct_mgmt returned: %d\n", pam_result);
+    }
 
-    bool ok = (r == PAM_SUCCESS);
-    if (!ok && error_out)
-        *error_out = pam_strerror(pamh, r);
+    bool ok = (pam_result == PAM_SUCCESS);
+    if (!ok && error_out){
+        *error_out = pam_strerror(pamhandler, pam_result);
+        printf("PAM auth error: %s\n", error_out->c_str());
+    }
 
-    pam_end(pamh, r);
+    pam_end(pamhandler, pam_result);
     return ok;
+}
+
+// Función para verificar si el usuario pertenece al grupo 'sudo'
+static bool is_user_admin(const std::string& username) {
+    struct passwd *pw = getpwnam(username.c_str());
+    if (!pw) return false;
+
+    // Root siempre es admin (UID 0)
+    if (pw->pw_uid == 0) return true;
+
+    // Buscamos el grupo 'sudo' (común en Debian/Ubuntu) o 'wheel' (CentOS/Arch)
+    const char* admin_groups[] = {"sudo", "wheel", "admin"};
+    
+    for (const char* group_name : admin_groups) {
+        struct group *gr = getgrnam(group_name);
+        if (!gr) continue;
+
+        // Verificar si es el grupo principal del usuario
+        if (pw->pw_gid == gr->gr_gid) return true;
+
+        // Verificar grupos secundarios
+        for (int i = 0; gr->gr_mem[i] != nullptr; i++) {
+            if (username == gr->gr_mem[i]) return true;
+        }
+    }
+
+    return false;
 }
 
 int main() {
@@ -225,6 +261,31 @@ int main() {
             response["message"] = "Ocurrió un error en el kernel (Error: " + std::to_string(result) + ")";
         }
         return crow::response(response);
+    });
+
+    CROW_ROUTE(app, "/login").methods(crow::HTTPMethod::POST)([](const crow::request& req){
+        auto json = crow::json::load(req.body);
+        if (!json || !json.has("username") || !json.has("password")) {
+            return crow::response(400, "JSON con 'username' y 'password' requerido");
+        }
+
+        std::string username = json["username"].s();
+        std::string password = json["password"].s();
+        std::string pam_err;
+
+        if (!pam_authenticate_user(username, password, &pam_err)) {
+            crow::json::wvalue body;
+            body["ok"] = false;
+            body["error"] = "Credenciales incorrectas o error de PAM: " + pam_err;
+            return crow::response(401, body);
+        }
+        bool is_admin = is_user_admin(username);
+
+        crow::json::wvalue body;
+        body["ok"] = true;
+        body["username"] = username;
+        body["is_admin"] = is_admin;
+        return crow::response(200, body);
     });
 
     app.port(18080).multithreaded().run();
